@@ -1,10 +1,10 @@
 name = ft_irc
 
-SRC = c&c_initial.cpp 
+SRC = client.cpp main.cpp \
 OBJ = $(SRC:.cpp=.o)
 
 CXX = c++
-CXXFLAGS = -Wall -Wextra -Werror -std=c++17 -g
+CXXFLAGS = -Wall -Wextra -Werror -std=c++98 
 RM = rm -f
 
 all: $(name)
@@ -16,11 +16,11 @@ $(name): $(OBJ)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 clean:
-	$(RM) $(OBJ)
+	$(RM
+re: fclean all
+) $(OBJ)
 
 fclean: clean
 	$(RM) $(name)
-
-re: fclean all
 
 .PHONY: all clean fclean re
