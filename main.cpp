@@ -7,7 +7,7 @@
 //	 std::string name;
 // public:
 //	 Channel(std::string name) : name(name) {}
-//	 std::string getName() const { return name; }
+//	 std::string getChannelName() const { return name; }
 // };
 
 // int main() {
@@ -34,7 +34,7 @@
 //	 std::cout << "Channels joined: " << std::endl;
 //	 std::vector<Channel*> channels = c1.getChannels();
 //	 for (std::vector<Channel*>::iterator it = channels.begin(); it != channels.end(); ++it) {
-//		 std::cout << " - " << (*it)->getName() << std::endl;
+//		 std::cout << " - " << (*it)->getChannelName() << std::endl;
 //	 }
 
 //	 // Leave one channel
@@ -43,7 +43,7 @@
 //	 std::cout << "Channels after leaving 'general': " << std::endl;
 //	 channels = c1.getChannels();
 //	 for (std::vector<Channel*>::iterator it = channels.begin(); it != channels.end(); ++it) {
-//		 std::cout << " - " << (*it)->getName() << std::endl;
+//		 std::cout << " - " << (*it)->getChannelName() << std::endl;
 //	 }
 
 //	 return 0;
@@ -52,59 +52,75 @@
 #include "client.hpp"
 #include "channel.hpp"
 #include <iostream>
+#include <vector>
 
 int main() {
-	// Create clients
-	Client alice("Alice", "alice123", "Alice Smith", 1, 0, true);
-	Client bob("Bob", "bobby", "Bob Johnson", 2, 0, true);
-	Client charlie("Charlie", "charlieX", "Charlie Brown", 3, 0, true);
+    // Create clients
+    Client* alice = new Client("Alice", "alice_u", "Alice Real", 1, 1, true);
+    Client* bob = new Client("Bob", "bob_u", "Bob Real", 2, 2, true);
+    Client* charlie = new Client("Charlie", "charlie_u", "Charlie Real", 3, 3, true);
 
-	// Create a channel
-	Channel general("#general");
+    // Create channel #general
+    Channel* general = new Channel("#general");
 
-	// Clients join the channel
-	general.addClient(&alice);
-	alice.joinChannel(&general);
+    // Add clients to channel
+    general->addClient(alice);
+    general->addClient(bob);
+    general->addClient(charlie);
 
-	general.addClient(&bob);
-	bob.joinChannel(&general);
+    // Display clients
+    std::cout << "Clients in " << general->getChannelName() << ": ";
+    std::vector<Client*> clients = general->getClients();
+    for (size_t i = 0; i < clients.size(); i++)
+        std::cout << clients[i]->getNickname() << " ";
+    std::cout << "\n\n";
 
-	general.addClient(&charlie);
-	charlie.joinChannel(&general);
+    // Broadcast test
+    std::cout << "Broadcast test (message from Alice):\n";
+    general->broadcast("Hello everyone!", alice);
+    std::cout << "\n";
 
-	// Print clients in channel
-	std::cout << "Clients in " << general.getChannelName() << ": ";
-	std::vector<Client*> clients = general.getClients();
-	for (std::vector<Client*>::size_type i = 0; i < clients.size(); ++i) {
-		std::cout << clients[i]->getNickname() << " ";
-	}
-	std::cout << std::endl;
+    // Topic test (operator-only)
+    general->setTopic("Initial Topic");
+    std::cout << "Set topic by non-operator (Bob): ";
+    general->setTopic("New Topic by Bob", bob); // Bob is not operator, should fail
+    std::cout << general->getTopic() << "\n";
+    std::cout << "Set topic by operator (Alice): ";
+    general->setTopic("New Topic by Alice", alice); // Alice is operator
+    std::cout << general->getTopic() << "\n\n";
 
-	// Broadcast a message from Alice
-	std::cout << "\nBroadcast test (message from Alice):\n";
-	for (std::vector<Client*>::size_type i = 0; i < clients.size(); ++i) {
-		if (clients[i] != &alice) {
-			std::cout << clients[i]->getNickname() 
-					  << " receives: Hello everyone!" << std::endl;
-		}
-	}
+    // User limit test
+    general->setUserLimit(2);
+    Client* david = new Client("David", "david_u", "David Real", 4, 4, true);
+    general->addClient(david); // Should not add (limit reached)
+    std::cout << "Clients in " << general->getChannelName() << " after adding David: ";
+    clients = general->getClients();
+    for (size_t i = 0; i < clients.size(); i++)
+        std::cout << clients[i]->getNickname() << " ";
+    std::cout << "\n\n";
 
-	// Check if Bob is in the channel
-	bool bobInChannel = general.hasMember(&bob);
-	std::cout << "\nIs Bob in " << general.getChannelName() << "? " 
-			  << (bobInChannel ? "Yes" : "No") << std::endl;
+    // Operator test
+    general->addOperator(bob);
+    std::cout << "Operators in " << general->getChannelName() << ": ";
+    std::vector<Client*> operators = general->getOperators();
+    for (size_t i = 0; i < operators.size(); i++)
+        std::cout << operators[i]->getNickname() << " ";
+    std::cout << "\n\n";
 
-	// Remove Charlie from the channel
-	general.removeClient(&charlie);
-	charlie.leaveChannel(&general);
+    // Remove a client
+    general->removeClient(charlie);
+    std::cout << "Clients in " << general->getChannelName() << " after Charlie left: ";
+    clients = general->getClients();
+    for (size_t i = 0; i < clients.size(); i++)
+        std::cout << clients[i]->getNickname() << " ";
+    std::cout << "\n\n";
 
-	// Print clients after Charlie leaves
-	std::cout << "\nClients in " << general.getChannelName() << " after Charlie left: ";
-	clients = general.getClients();
-	for (std::vector<Client*>::size_type i = 0; i < clients.size(); ++i) {
-		std::cout << clients[i]->getNickname() << " ";
-	}
-	std::cout << std::endl;
+    // Cleanup
+    delete alice;
+    delete bob;
+    delete charlie;
+    delete david;
+    delete general;
 
-	return 0;
+    return 0;
 }

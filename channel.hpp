@@ -14,6 +14,11 @@ class Channel {
 		std::string topic;
 		std::vector<Client *> clients;
 		std::vector<Client*> operators;
+		std::string key;
+		size_t userLimit;
+		bool inviteOnly;
+		bool topicProtected;
+
 
 	public:
 		Channel(std::string const &channel_name);
@@ -21,9 +26,19 @@ class Channel {
 
 		std::string getChannelName() const;
 		std::string getTopic() const;
-		void setTopic(std::string const &topic);
+		void setTopic(const std::string& topic, Client* setter = NULL);
 
-		void addClient(Client *client);
+		void setKey(const std::string& key);
+		std::string getKey() const;
+		void setUserLimit(size_t limit);
+		size_t getUserLimit() const;
+		void setInviteOnly(bool mode);
+		bool isInviteOnly() const;
+		void setTopicProtected(bool mode);
+		bool isTopicProtected() const;
+
+
+		void addClient(Client *client, const std::string& password = "");
 		void removeClient(Client *client);
 		std::vector<Client *> getClients() const;
 		std::vector<Client*> getOperators() const;

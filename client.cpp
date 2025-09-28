@@ -1,5 +1,6 @@
 #include "client.hpp"
 #include <unistd.h>
+#include <iostream>
 
 Client::Client(std::string nickname, std::string username, std::string realname, int fd, int s_fd, bool registered)
 	: nickname(nickname), username(username), realname(realname), fd(fd), s_fd(s_fd), registered(registered) {}
@@ -17,6 +18,9 @@ Client &Client::operator=(Client const &other) {
 		s_fd = other.s_fd;
 		registered = other.registered;
 		list_channels = other.list_channels;
+		authenticated = other.authenticated;
+		welcomeMsg = other.welcomeMsg;
+		hostname = other.hostname;
 	}
 	return *this;
 }
@@ -35,6 +39,10 @@ std::string Client::getRealname() const {
 	return realname;
 }
 
+std::string Client::getHostname() const {
+	return hostname;
+}
+
 int Client::getFd() const {
 	return fd;
 }
@@ -49,6 +57,22 @@ void Client::setRegistered(bool status) {
 
 bool Client::isregistered() const{
 	return registered;
+}
+
+bool Client::isAuthenticated() const {
+	return authenticated;
+}
+
+void Client::setAuthenticated(bool status) {
+	authenticated = status;
+}
+
+bool Client::hasWelcomeMsg() const {
+	return welcomeMsg;
+}
+
+void Client::setWelcomeMsg(bool status) {
+	welcomeMsg = status;
 }
 
 void Client::joinChannel(Channel* channel) {
@@ -73,20 +97,25 @@ bool Client::isInChannel(Channel* channel) const {
 }
 
 bool Client::hasClient(Client* client) const {
-	for (std::vector<Client*>::size_type i = 0; i < clients.size(); ++i) {
-		if (clients[i] == client) {
-				return true;
-		}
+	for (std::vector<Channel*>::size_type i = 0; i < list_channels.size(); ++i) {
+		if (list_channels[i]->hasMember(client))
+			return true;
 	}
-	 return false;
+	return false;
 }
-
 void Client::clearChannels() {
 	list_channels.clear();
+}
+
+std::string Client::getPrefix() const {
+	return nickname + "!" + username + "@" + hostname;
 }
 
 void Client::sendMessage(const std::string& message) const {
 	if (fd > 0) {
 		write(fd, message.c_str(), message.size());
+	} else {
+		// For testing without socket
+		std::cout << nickname << " receives: " << message << std::endl;
 	}
 }
