@@ -8,14 +8,14 @@ CXXFLAGS = -Wall -Wextra -Werror -std=c++98
 NAME = ircserv
 
 # Source files
-SRCS = src/main.cpp \
-       src/Server.cpp
+SRCS = main.cpp \
+       Server.cpp
 
 # Object files
 OBJS = $(SRCS:.cpp=.o)
 
 # Header files
-HDRS = include/Server.hpp
+HDRS = Server.hpp
 
 # Default rule
 all: $(NAME)
@@ -25,8 +25,8 @@ $(NAME): $(OBJS)
 	$(CXX) $(CXXFLAGS) -o $(NAME) $(OBJS)
 
 # Rule to compile source files into object files
-src/%.o: src/%.cpp $(HDRS)
-	$(CXX) $(CXXFLAGS) -Iinclude -c $< -o $@
+%.o: %.cpp $(HDRS)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 # Rule to clean object files
 clean:
