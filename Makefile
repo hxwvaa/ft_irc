@@ -9,20 +9,13 @@ NAME = ircserv
 
 # Source files
 SRCS = src/main.cpp \
-       src/Server.cpp \
-       src/Client.cpp \
-       src/Message.cpp \
-       src/Channel.cpp
+       src/Server.cpp
 
 # Object files
 OBJS = $(SRCS:.cpp=.o)
 
 # Header files
-HDRS = include/Server.hpp \
-       include/Client.hpp \
-       include/Message.hpp
-
-
+HDRS = include/Server.hpp
 
 # Default rule
 all: $(NAME)

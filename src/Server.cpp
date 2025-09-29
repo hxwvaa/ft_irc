@@ -1,13 +1,17 @@
 #include "Server.hpp"
-#include "Client.hpp"
-#include "Message.hpp"
 #include <iostream>
-#include <sstream>
-#include <csignal>
 #include <sys/socket.h>
-#include <unistd.h>
 #include <netinet/in.h>
+#include <unistd.h>
+#include <stdexcept>
 #include <fcntl.h>
+#include <poll.h>
+#include <vector>
+#include <csignal>
+#include <cstring>
+#include <sstream>
+#include <algorithm>
+#include <cctype>
 
 static bool g_server_running = true;
 
@@ -18,32 +22,60 @@ void Server::signalHandler(int signum) {
 
 Server::Server(int port, const std::string &password)
     : _port(port), _password(password), _sockfd(-1) {
-    std::cout << "Server created with port " << _port << std::endl;
+    std::cout << "IRC Server starting on port " << _port << std::endl;
     signal(SIGINT, Server::signalHandler);
     signal(SIGQUIT, Server::signalHandler);
-
-    // Register commands
-    _commands["PASS"] = &Server::pass;
-    _commands["NICK"] = &Server::nick;
-    _commands["USER"] = &Server::user;
-    _commands["JOIN"] = &Server::join;
-    _commands["PRIVMSG"] = &Server::privmsg;
-    _commands["NICK"] = &Server::nick;
 }
 
 Server::~Server() {
-    // Cleanup code if needed
+    for (size_t i = 0; i < _fds.size(); ++i) {
+        close(_fds[i].fd);
+    }
+}
+
+void Server::setup() {
+    _sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (_sockfd < 0) {
+        throw std::runtime_error("Failed to create socket");
+    }
+
+    if (fcntl(_sockfd, F_SETFL, O_NONBLOCK) < 0) {
+        throw std::runtime_error("Failed to set socket to non-blocking");
+    }
+
+    int opt = 1;
+    if (setsockopt(_sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+        throw std::runtime_error("Failed to set socket options");
+    }
+
+    sockaddr_in serv_addr;
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_addr.s_addr = INADDR_ANY;
+    serv_addr.sin_port = htons(_port);
+
+    if (bind(_sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+        throw std::runtime_error("Failed to bind socket");
+    }
+
+    if (listen(_sockfd, 10) < 0) {
+        throw std::runtime_error("Failed to listen on socket");
+    }
+
+    struct pollfd pfd;
+    pfd.fd = _sockfd;
+    pfd.events = POLLIN;
+    _fds.push_back(pfd);
 }
 
 void Server::run() {
     setup();
-
-    std::cout << "Server listening on port " << _port << std::endl;
-
+    std::cout << "IRC Server running on port " << _port << std::endl;
+    
     while (g_server_running) {
-        if (poll(_fds.data(), _fds.size(), -1) < 0 && g_server_running) {
-            std::cerr << "Error in poll" << std::endl;
-            break;
+        int poll_count = poll(_fds.data(), _fds.size(), -1);
+        if (poll_count < 0) {
+            if (!g_server_running) break;
+            throw std::runtime_error("Poll failed");
         }
 
         if (_fds[0].revents & POLLIN) {
@@ -56,276 +88,571 @@ void Server::run() {
             }
         }
     }
-    close(_sockfd);
-}
-
-void Server::setup() {
-    _sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (_sockfd < 0) {
-        throw std::runtime_error("Error creating socket");
-    }
-
-    int opt = 1;
-    if (setsockopt(_sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
-        throw std::runtime_error("Error setting socket options");
-    }
-
-    if (fcntl(_sockfd, F_SETFL, O_NONBLOCK) < 0) {
-        throw std::runtime_error("Error setting socket to non-blocking");
-    }
-
-    struct sockaddr_in server_addr;
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_addr.s_addr = INADDR_ANY;
-    server_addr.sin_port = htons(_port);
-
-    if (bind(_sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
-        throw std::runtime_error("Error binding socket");
-    }
-
-    if (listen(_sockfd, 5) < 0) {
-        throw std::runtime_error("Error listening on socket");
-    }
-
-    _fds.push_back((struct pollfd){_sockfd, POLLIN, 0});
+    std::cout << "\nShutting down IRC server." << std::endl;
 }
 
 void Server::handleNewConnection() {
-    struct sockaddr_in client_addr;
+    sockaddr_in client_addr;
     socklen_t client_len = sizeof(client_addr);
     int client_fd = accept(_sockfd, (struct sockaddr *)&client_addr, &client_len);
     if (client_fd < 0) {
-        std::cerr << "Error accepting new connection" << std::endl;
+        std::cerr << "Failed to accept new connection" << std::endl;
         return;
     }
 
     if (fcntl(client_fd, F_SETFL, O_NONBLOCK) < 0) {
-        std::cerr << "Error setting client socket to non-blocking" << std::endl;
+        std::cerr << "Failed to set client socket to non-blocking" << std::endl;
         close(client_fd);
         return;
     }
 
-    _fds.push_back((struct pollfd){client_fd, POLLIN, 0});
-    _clients.insert(std::make_pair(client_fd, Client(client_fd)));
-    std::cout << "New connection from client with fd " << client_fd << std::endl;
+    struct pollfd pfd;
+    pfd.fd = client_fd;
+    pfd.events = POLLIN;
+    _fds.push_back(pfd);
+
+    _clients.insert(std::make_pair(client_fd, ClientInfo(client_fd)));
+    std::cout << "New client connected: fd " << client_fd << std::endl;
 }
 
 void Server::handleClientData(int fd) {
     char buffer[512];
-    ssize_t nbytes = recv(fd, buffer, sizeof(buffer) - 1, 0);
+    int nbytes = recv(fd, buffer, sizeof(buffer) - 1, 0);
+
     if (nbytes <= 0) {
         if (nbytes == 0) {
-            std::cout << "Client with fd " << fd << " disconnected." << std::endl;
+            std::cout << "Client fd " << fd << " disconnected" << std::endl;
         } else {
-            if (g_server_running)
-                std::cerr << "Error receiving data from client " << fd << std::endl;
+            std::cerr << "Error receiving data from client " << fd << std::endl;
         }
         removeClient(fd);
-    } else {
-        buffer[nbytes] = '\0';
-        Client &client = _clients.at(fd);
-        client._buffer += buffer;
+        return;
+    }
+
+    buffer[nbytes] = '\0';
+    ClientInfo& client = _clients[fd];
+    client.buffer += buffer;
+
+    // Process complete messages (ending with \r\n or \n)
+    size_t pos;
+    while ((pos = client.buffer.find("\n")) != std::string::npos) {
+        std::string message = client.buffer.substr(0, pos);
+        client.buffer.erase(0, pos + 1);
         
-        size_t pos;
-        while ((pos = client._buffer.find("\r\n")) != std::string::npos) {
-            std::string line = client._buffer.substr(0, pos);
-            client._buffer.erase(0, pos + 2);
-            if (!line.empty()) {
-                processMessage(client, line);
-            }
+        // Remove \r if present before \n
+        if (!message.empty() && message[message.length() - 1] == '\r') {
+            message = message.substr(0, message.length() - 1);
         }
-    }
-}
-
-void Server::processMessage(Client &client, const std::string &line) {
-    std::cout << "<- " << line << std::endl;
-    Message message(line);
-    if (message.getCommand().empty()) return;
-
-    if (!client.isAuthenticated() && message.getCommand() != "PASS" && message.getCommand() != "NICK" && message.getCommand() != "USER") {
-        sendReply(client.getFd(), "451 :You have not registered\r\n");
-        return;
-    }
-
-    std::map<std::string, CommandFunction>::iterator it = _commands.find(message.getCommand());
-    if (it != _commands.end()) {
-        (this->*(it->second))(client, message);
-    } else {
-        sendReply(client.getFd(), "421 " + message.getCommand() + " :Unknown command\r\n");
-    }
-}
-
-void Server::sendReply(int fd, const std::string &reply) {
-    std::cout << "-> " << reply;
-    if (send(fd, reply.c_str(), reply.length(), 0) < 0) {
-        std::cerr << "Error sending reply to client " << fd << std::endl;
-    }
-}
-
-void Server::pass(Client &client, const Message &message) {
-    if (client.isRegistered()) {
-        sendReply(client.getFd(), "462 :You may not reregister\r\n");
-        return;
-    }
-    if (message.getParams().empty()) {
-        sendReply(client.getFd(), "461 PASS :Not enough parameters\r\n");
-        return;
-    }
-    if (message.getParams()[0] == _password) {
-        client.setAuthenticated(true);
-        std::cout << "Client " << client.getFd() << " authenticated." << std::endl;
-        client.checkRegistration();
-    } else {
-        sendReply(client.getFd(), "464 :Password incorrect\r\n");
-    }
-}
-
-void Server::nick(Client &client, const Message &message) {
-    if (message.getParams().empty() || message.getParams()[0].empty()) {
-        sendReply(client.getFd(), "431 :No nickname given\r\n");
-        return;
-    }
-    std::string new_nick = message.getParams()[0];
-
-    for (std::map<int, Client>::iterator it = _clients.begin(); it != _clients.end(); ++it) {
-        if (it->second.getNickname() == new_nick) {
-            sendReply(client.getFd(), "433 " + new_nick + " :Nickname is already in use\r\n");
-            return;
+        
+        if (!message.empty()) {
+            std::cout << "Received message: [" << message << "]" << std::endl;
+            processMessage(fd, message);
         }
-    }
-
-    std::string old_nick = client.getNickname();
-    client.setNickname(new_nick);
-    if (client.isRegistered() && !old_nick.empty()) {
-        std::string nick_change_msg = ":" + old_nick + " NICK :" + new_nick + "\r\n";
-        sendReply(client.getFd(), nick_change_msg);
-    }
-    std::cout << "Client " << client.getFd() << " set nickname to " << new_nick << std::endl;
-    client.checkRegistration();
-}
-
-void Server::user(Client &client, const Message &message) {
-    if (client.isRegistered()) {
-        sendReply(client.getFd(), "462 :You may not reregister\r\n");
-        return;
-    }
-    if (message.getParams().size() < 4) {
-        sendReply(client.getFd(), "461 USER :Not enough parameters\r\n");
-        return;
-    }
-    client.setUsername(message.getParams()[0]);
-    client.setRealname(message.getParams()[3]);
-    std::cout << "Client " << client.getFd() << " set user details." << std::endl;
-    client.checkRegistration();
-
-    if (client.isRegistered()) {
-        std::string welcome_msg = "001 " + client.getNickname() + " :Welcome to the IRC Network, " + client.getNickname() + "\r\n";
-        sendReply(client.getFd(), welcome_msg);
-    }
-}
-
-void Server::join(Client &client, const Message &message) {
-    if (!client.isRegistered()) {
-        sendReply(client.getFd(), "451 :You have not registered\r\n");
-        return;
-    }
-    if (message.getParams().empty()) {
-        sendReply(client.getFd(), "461 JOIN :Not enough parameters\r\n");
-        return;
-    }
-    std::string channelName = message.getParams()[0];
-    
-    std::map<std::string, Channel>::iterator it = _channels.find(channelName);
-    if (it == _channels.end()) {
-        _channels.insert(std::make_pair(channelName, Channel(channelName)));
-        it = _channels.find(channelName);
-    }
-    
-    it->second.addClient(&client);
-    
-    std::string join_msg = ":" + client.getNickname() + "!" + client.getUsername() + "@localhost JOIN " + channelName + "\r\n";
-    sendReply(client.getFd(), join_msg);
-
-    std::string topic_msg = "332 " + client.getNickname() + " " + channelName + " :No topic is set\r\n";
-    sendReply(client.getFd(), topic_msg);
-
-    std::string names_list;
-    const std::vector<Client*>& clients = it->second.getClients();
-    for (size_t i = 0; i < clients.size(); ++i) {
-        names_list += clients[i]->getNickname() + " ";
-    }
-    
-    std::string names_reply = "353 " + client.getNickname() + " = " + channelName + " :" + names_list + "\r\n";
-    sendReply(client.getFd(), names_reply);
-    
-    std::string end_of_names_reply = "366 " + client.getNickname() + " " + channelName + " :End of /NAMES list.\r\n";
-    sendReply(client.getFd(), end_of_names_reply);
-
-    it->second.broadcast(join_msg, &client);
-}
-
-void Server::privmsg(Client &client, const Message &message) {
-    if (!client.isRegistered()) {
-        sendReply(client.getFd(), "451 :You have not registered\r\n");
-        return;
-    }
-    if (message.getParams().size() < 2) {
-        sendReply(client.getFd(), "461 PRIVMSG :Not enough parameters\r\n");
-        return;
-    }
-    std::string target = message.getParams()[0];
-    std::string msg = message.getParams()[1];
-    std::string full_msg = ":" + client.getNickname() + "!" + client.getUsername() + "@localhost PRIVMSG " + target + " :" + msg + "\r\n";
-
-    if (target[0] == '#') {
-        std::map<std::string, Channel>::iterator it = _channels.find(target);
-        if (it != _channels.end()) {
-            it->second.broadcast(full_msg, &client);
-        } else {
-            sendReply(client.getFd(), "403 " + client.getNickname() + " " + target + " :No such channel\r\n");
-        }
-    } else {
-        // Private message to user
-        for (std::map<int, Client>::iterator it = _clients.begin(); it != _clients.end(); ++it) {
-            if (it->second.getNickname() == target) {
-                sendReply(it->second.getFd(), full_msg);
-                return;
-            }
-        }
-        sendReply(client.getFd(), "401 " + client.getNickname() + " " + target + " :No such nick/channel\r\n");
     }
 }
 
 void Server::removeClient(int fd) {
-    // Find the client to be removed
-    std::map<int, Client>::iterator client_it = _clients.find(fd);
-    if (client_it == _clients.end()) {
-        return; // Client not found
+    ClientInfo& client = _clients[fd];
+    
+    // Remove from all channels
+    for (std::set<std::string>::iterator it = client.channels.begin(); 
+         it != client.channels.end(); ++it) {
+        _channels[*it].erase(fd);
+        if (_channels[*it].empty()) {
+            _channels.erase(*it);
+        }
     }
-
-    // Notify channels that the client is leaving
-    for (std::map<std::string, Channel>::iterator channel_it = _channels.begin(); channel_it != _channels.end(); ++channel_it) {
-        channel_it->second.removeClient(&client_it->second);
-        std::string part_msg = ":" + client_it->second.getNickname() + " PART " + channel_it->first + "\r\n";
-        channel_it->second.broadcast(part_msg, NULL);
-    }
-
-    // Remove client from the main list
-    _clients.erase(client_it);
-
-    // Remove the file descriptor from the poll set
+    
+    close(fd);
+    _clients.erase(fd);
+    
     for (size_t i = 0; i < _fds.size(); ++i) {
         if (_fds[i].fd == fd) {
             _fds.erase(_fds.begin() + i);
             break;
         }
     }
-
-    close(fd);
-    std::cout << "Client with fd " << fd << " removed." << std::endl;
 }
 
-void Server::nick(Client &client, const Message &message);
-void Server::user(Client &client, const Message &message);
-void Server::join(Client &client, const Message &message);
-void Server::privmsg(Client &client, const Message &message);
+void Server::processMessage(int fd, const std::string& message) {
+    std::vector<std::string> tokens = parseMessage(message);
+    if (tokens.empty()) return;
+
+    std::string command = tokens[0];
+    std::transform(command.begin(), command.end(), command.begin(), ::toupper);
+    std::vector<std::string> params(tokens.begin() + 1, tokens.end());
+
+    std::cout << "Client " << fd << ": " << command;
+    for (size_t i = 0; i < params.size(); ++i) {
+        std::cout << " [" << params[i] << "]";
+    }
+    std::cout << std::endl;
+
+    // Handle IRC commands that irssi and other clients use
+    if (command == "PASS") {
+        handlePass(fd, params);
+    } else if (command == "NICK") {
+        handleNick(fd, params);
+    } else if (command == "USER") {
+        handleUser(fd, params);
+    } else if (command == "JOIN") {
+        handleJoin(fd, params);
+    } else if (command == "PRIVMSG") {
+        handlePrivMsg(fd, params);
+    } else if (command == "QUIT") {
+        handleQuit(fd, params);
+    } else if (command == "PING") {
+        handlePing(fd, params);
+    } else if (command == "PART") {
+        handlePart(fd, params);
+    } else if (command == "MODE") {
+        handleMode(fd, params);
+    } else if (command == "WHO") {
+        handleWho(fd, params);
+    } else if (command == "LIST") {
+        handleList(fd, params);
+    } else if (command == "TOPIC") {
+        // Handle TOPIC command
+        ClientInfo& client = _clients[fd];
+        if (!client.registered) {
+            sendReply(fd, "451 :You have not registered\\r\\n");
+            return;
+        }
+        if (params.empty()) {
+            sendReply(fd, "461 TOPIC :Not enough parameters\\r\\n");
+            return;
+        }
+        std::string channel = params[0];
+        if (params.size() > 1) {
+            // Set topic (just acknowledge for now)
+            sendReply(fd, "332 " + client.nickname + " " + channel + " :" + params[1] + "\\r\\n");
+        } else {
+            // Get topic (no topic set)
+            sendReply(fd, "331 " + client.nickname + " " + channel + " :No topic is set\\r\\n");
+        }
+    } else if (command == "NAMES") {
+        // Handle NAMES command  
+        ClientInfo& client = _clients[fd];
+        if (!client.registered) {
+            sendReply(fd, "451 :You have not registered\\r\\n");
+            return;
+        }
+        if (!params.empty()) {
+            std::string channel = params[0];
+            if (_channels.find(channel) != _channels.end()) {
+                std::string names = "";
+                for (std::set<int>::iterator it = _channels[channel].begin(); 
+                     it != _channels[channel].end(); ++it) {
+                    if (!names.empty()) names += " ";
+                    names += _clients[*it].nickname;
+                }
+                sendReply(fd, "353 " + client.nickname + " = " + channel + " :" + names + "\\r\\n");
+            }
+            sendReply(fd, "366 " + client.nickname + " " + channel + " :End of NAMES list\\r\\n");
+        }
+    } else if (command == "NOTICE") {
+        // Handle NOTICE command (similar to PRIVMSG but no auto-replies)
+        handlePrivMsg(fd, params); // For simplicity, treat like PRIVMSG
+    } else {
+        sendReply(fd, "421 " + command + " :Unknown command\\r\\n");
+    }
+}
+
+std::vector<std::string> Server::parseMessage(const std::string& message) {
+    std::vector<std::string> tokens;
+    
+    if (message.empty()) return tokens;
+    
+    // Find the start of the message (skip any leading whitespace)
+    size_t pos = 0;
+    while (pos < message.length() && (message[pos] == ' ' || message[pos] == '\t')) {
+        pos++;
+    }
+    
+    // Parse the message according to IRC RFC 2812
+    // Format: [':' prefix SPACE] command [SPACE params] [SPACE ':' trailing]
+    
+    // Skip prefix if present (starts with ':')
+    if (pos < message.length() && message[pos] == ':') {
+        // Skip to next space (end of prefix)
+        while (pos < message.length() && message[pos] != ' ') {
+            pos++;
+        }
+        // Skip spaces after prefix
+        while (pos < message.length() && message[pos] == ' ') {
+            pos++;
+        }
+    }
+    
+    // Parse command and parameters
+    while (pos < message.length()) {
+        if (message[pos] == ' ') {
+            // Skip multiple spaces
+            while (pos < message.length() && message[pos] == ' ') {
+                pos++;
+            }
+            continue;
+        }
+        
+        if (message[pos] == ':') {
+            // Trailing parameter - everything after ':' until end of line
+            pos++; // Skip the ':'
+            std::string trailing = message.substr(pos);
+            // Remove trailing \r\n if present
+            size_t end = trailing.find_last_not_of("\r\n");
+            if (end != std::string::npos) {
+                trailing = trailing.substr(0, end + 1);
+            }
+            if (!trailing.empty()) {
+                tokens.push_back(trailing);
+            }
+            break;
+        } else {
+            // Regular parameter - until next space or ':'
+            size_t start = pos;
+            while (pos < message.length() && message[pos] != ' ' && message[pos] != ':') {
+                pos++;
+            }
+            std::string param = message.substr(start, pos - start);
+            // Remove trailing \r\n if it's the last parameter
+            size_t end = param.find_last_not_of("\r\n");
+            if (end != std::string::npos) {
+                param = param.substr(0, end + 1);
+            }
+            if (!param.empty()) {
+                tokens.push_back(param);
+            }
+        }
+    }
+    
+    return tokens;
+}
+
+std::string Server::extractCommand(const std::string& message) {
+    std::istringstream iss(message);
+    std::string command;
+    iss >> command;
+    
+    // Convert to uppercase for case-insensitive comparison
+    std::transform(command.begin(), command.end(), command.begin(), ::toupper);
+    return command;
+}
+
+bool Server::isValidNickname(const std::string& nick) {
+    if (nick.empty() || nick.length() > 9) return false;
+    
+    // First character must be letter
+    if (!std::isalpha(nick[0])) return false;
+    
+    // Rest can be letters, digits, or special characters
+    for (size_t i = 1; i < nick.length(); ++i) {
+        char c = nick[i];
+        if (!std::isalnum(c) && c != '-' && c != '_' && c != '[' && c != ']' && 
+            c != '{' && c != '}' && c != '\\' && c != '|') {
+            return false;
+        }
+    }
+    return true;
+}
+
+void Server::sendReply(int fd, const std::string& reply) {
+    send(fd, reply.c_str(), reply.length(), 0);
+}
+
+void Server::broadcastToChannel(const std::string& channel, const std::string& message, int exclude_fd) {
+    std::map<std::string, std::set<int> >::iterator it = _channels.find(channel);
+    if (it != _channels.end()) {
+        for (std::set<int>::iterator client_it = it->second.begin(); 
+             client_it != it->second.end(); ++client_it) {
+            if (*client_it != exclude_fd) {
+                sendReply(*client_it, message);
+            }
+        }
+    }
+}
+
+void Server::handlePass(int fd, const std::vector<std::string>& params) {
+    if (params.empty()) {
+        sendReply(fd, "461 PASS :Not enough parameters\r\n");
+        return;
+    }
+    
+    ClientInfo& client = _clients[fd];
+    if (params[0] == _password) {
+        client.authenticated = true;
+        std::cout << "Client " << fd << " authenticated" << std::endl;
+    } else {
+        sendReply(fd, "464 :Password incorrect\r\n");
+    }
+}
+
+void Server::handleNick(int fd, const std::vector<std::string>& params) {
+    if (params.empty()) {
+        sendReply(fd, "431 :No nickname given\r\n");
+        return;
+    }
+
+    ClientInfo& client = _clients[fd];
+    std::string new_nick = params[0];
+    
+    if (!isValidNickname(new_nick)) {
+        sendReply(fd, "432 " + new_nick + " :Erroneous nickname\r\n");
+        return;
+    }
+    
+    // Check if nick is already in use
+    for (std::map<int, ClientInfo>::iterator it = _clients.begin(); 
+         it != _clients.end(); ++it) {
+        if (it->first != fd && it->second.nickname == new_nick) {
+            sendReply(fd, "433 " + new_nick + " :Nickname is already in use\r\n");
+            return;
+        }
+    }
+    
+    client.nickname = new_nick;
+    std::cout << "Client " << fd << " set nickname to " << new_nick << std::endl;
+    
+    // Check if we can complete registration
+    if (client.authenticated && !client.nickname.empty() && !client.username.empty() && !client.registered) {
+        client.registered = true;
+        sendReply(fd, "001 " + client.nickname + " :Welcome to the IRC Network " + client.nickname + "!" + client.username + "@" + client.hostname + "\r\n");
+        sendReply(fd, "002 " + client.nickname + " :Your host is ircserver, running version 1.0\r\n");
+        sendReply(fd, "003 " + client.nickname + " :This server was created at startup\r\n");
+        sendReply(fd, "004 " + client.nickname + " ircserver 1.0 o o\r\n");
+        sendReply(fd, "375 " + client.nickname + " :- ircserver Message of the day - \r\n");
+        sendReply(fd, "372 " + client.nickname + " :- Welcome to our IRC server!\r\n");
+        sendReply(fd, "376 " + client.nickname + " :End of MOTD command\r\n");
+        std::cout << "Client " << fd << " (" << client.nickname << ") registered" << std::endl;
+    }
+}
+
+void Server::handleUser(int fd, const std::vector<std::string>& params) {
+    if (params.size() < 4) {
+        sendReply(fd, "461 USER :Not enough parameters\r\n");
+        return;
+    }
+
+    ClientInfo& client = _clients[fd];
+    client.username = params[0];
+    client.hostname = params[1];
+    client.realname = params[3];
+    
+    std::cout << "Client " << fd << " set user info: " << client.username << std::endl;
+    
+    // Check if we can complete registration
+    if (client.authenticated && !client.nickname.empty() && !client.username.empty() && !client.registered) {
+        client.registered = true;
+        sendReply(fd, "001 " + client.nickname + " :Welcome to the IRC Network " + client.nickname + "!" + client.username + "@" + client.hostname + "\r\n");
+        sendReply(fd, "002 " + client.nickname + " :Your host is ircserver, running version 1.0\r\n");
+        sendReply(fd, "003 " + client.nickname + " :This server was created at startup\r\n");
+        sendReply(fd, "004 " + client.nickname + " ircserver 1.0 o o\r\n");
+        sendReply(fd, "375 " + client.nickname + " :- ircserver Message of the day - \r\n");
+        sendReply(fd, "372 " + client.nickname + " :- Welcome to our IRC server!\r\n");
+        sendReply(fd, "376 " + client.nickname + " :End of MOTD command\r\n");
+        std::cout << "Client " << fd << " (" << client.nickname << ") registered" << std::endl;
+    }
+}
+
+void Server::handleJoin(int fd, const std::vector<std::string>& params) {
+    ClientInfo& client = _clients[fd];
+    if (!client.registered) {
+        sendReply(fd, "451 :You have not registered\r\n");
+        return;
+    }
+    
+    if (params.empty()) {
+        sendReply(fd, "461 JOIN :Not enough parameters\r\n");
+        return;
+    }
+
+    std::string channel = params[0];
+    if (channel[0] != '#') {
+        channel = "#" + channel;
+    }
+    
+    client.channels.insert(channel);
+    _channels[channel].insert(fd);
+    
+    sendReply(fd, ":" + client.nickname + " JOIN :" + channel + "\r\n");
+    sendReply(fd, "353 " + client.nickname + " = " + channel + " :" + client.nickname + "\r\n");
+    sendReply(fd, "366 " + client.nickname + " " + channel + " :End of NAMES list\r\n");
+    
+    std::cout << "Client " << client.nickname << " joined " << channel << std::endl;
+}
+
+void Server::handlePrivMsg(int fd, const std::vector<std::string>& params) {
+    ClientInfo& client = _clients[fd];
+    if (!client.registered) {
+        sendReply(fd, "451 :You have not registered\r\n");
+        return;
+    }
+    
+    if (params.size() < 2) {
+        sendReply(fd, "461 PRIVMSG :Not enough parameters\r\n");
+        return;
+    }
+
+    std::string target = params[0];
+    std::string message = params[1];
+    
+    if (target[0] == '#') {
+        // Channel message
+        if (_channels.find(target) != _channels.end()) {
+            std::string msg = ":" + client.nickname + " PRIVMSG " + target + " :" + message + "\r\n";
+            broadcastToChannel(target, msg, fd);
+            std::cout << "Channel " << target << " <" << client.nickname << "> " << message << std::endl;
+        } else {
+            sendReply(fd, "403 " + target + " :No such channel\r\n");
+        }
+    } else {
+        // Private message to user
+        for (std::map<int, ClientInfo>::iterator it = _clients.begin(); 
+             it != _clients.end(); ++it) {
+            if (it->second.nickname == target) {
+                std::string msg = ":" + client.nickname + " PRIVMSG " + target + " :" + message + "\r\n";
+                sendReply(it->first, msg);
+                std::cout << "Private <" << client.nickname << " -> " << target << "> " << message << std::endl;
+                return;
+            }
+        }
+        sendReply(fd, "401 " + target + " :No such nick\r\n");
+    }
+}
+
+void Server::handleQuit(int fd, const std::vector<std::string>& params) {
+    ClientInfo& client = _clients[fd];
+    std::string quit_msg = "Client Quit";
+    if (!params.empty()) {
+        quit_msg = params[0];
+    }
+    
+    std::cout << "Client " << client.nickname << " quit: " << quit_msg << std::endl;
+    removeClient(fd);
+}
+
+void Server::handlePing(int fd, const std::vector<std::string>& params) {
+    if (params.empty()) {
+        sendReply(fd, "409 :No origin specified\r\n");
+        return;
+    }
+    
+    // Respond with PONG
+    sendReply(fd, "PONG ircserver :" + params[0] + "\r\n");
+}
+
+void Server::handlePart(int fd, const std::vector<std::string>& params) {
+    ClientInfo& client = _clients[fd];
+    if (!client.registered) {
+        sendReply(fd, "451 :You have not registered\r\n");
+        return;
+    }
+    
+    if (params.empty()) {
+        sendReply(fd, "461 PART :Not enough parameters\r\n");
+        return;
+    }
+
+    std::string channel = params[0];
+    if (channel[0] != '#') {
+        channel = "#" + channel;
+    }
+    
+    if (client.channels.find(channel) == client.channels.end()) {
+        sendReply(fd, "442 " + channel + " :You're not on that channel\r\n");
+        return;
+    }
+    
+    std::string part_msg = "Leaving";
+    if (params.size() > 1) {
+        part_msg = params[1];
+    }
+    
+    client.channels.erase(channel);
+    _channels[channel].erase(fd);
+    
+    std::string msg = ":" + client.nickname + " PART " + channel + " :" + part_msg + "\r\n";
+    broadcastToChannel(channel, msg, -1); // Send to all including the one leaving
+    
+    if (_channels[channel].empty()) {
+        _channels.erase(channel);
+    }
+    
+    std::cout << "Client " << client.nickname << " left " << channel << std::endl;
+}
+
+void Server::handleMode(int fd, const std::vector<std::string>& params) {
+    ClientInfo& client = _clients[fd];
+    if (!client.registered) {
+        sendReply(fd, "451 :You have not registered\r\n");
+        return;
+    }
+    
+    if (params.empty()) {
+        sendReply(fd, "461 MODE :Not enough parameters\r\n");
+        return;
+    }
+    
+    std::string target = params[0];
+    
+    if (target[0] == '#') {
+        // Channel mode - just send back basic channel modes
+        sendReply(fd, "324 " + client.nickname + " " + target + " +nt\r\n");
+    } else {
+        // User mode - just acknowledge
+        sendReply(fd, "221 " + client.nickname + " +i\r\n");
+    }
+}
+
+void Server::handleWho(int fd, const std::vector<std::string>& params) {
+    ClientInfo& client = _clients[fd];
+    if (!client.registered) {
+        sendReply(fd, "451 :You have not registered\r\n");
+        return;
+    }
+    
+    if (params.empty()) {
+        sendReply(fd, "315 " + client.nickname + " * :End of WHO list\r\n");
+        return;
+    }
+    
+    std::string target = params[0];
+    
+    if (target[0] == '#') {
+        // Channel WHO
+        std::map<std::string, std::set<int> >::iterator it = _channels.find(target);
+        if (it != _channels.end()) {
+            for (std::set<int>::iterator client_it = it->second.begin(); 
+                 client_it != it->second.end(); ++client_it) {
+                ClientInfo& target_client = _clients[*client_it];
+                sendReply(fd, "352 " + client.nickname + " " + target + " " + 
+                         target_client.username + " " + target_client.hostname + 
+                         " ircserver " + target_client.nickname + " H :0 " + 
+                         target_client.realname + "\r\n");
+            }
+        }
+        sendReply(fd, "315 " + client.nickname + " " + target + " :End of WHO list\r\n");
+    } else {
+        sendReply(fd, "315 " + client.nickname + " " + target + " :End of WHO list\r\n");
+    }
+}
+
+void Server::handleList(int fd, const std::vector<std::string>& params) {
+    (void)params; // Unused parameter
+    ClientInfo& client = _clients[fd];
+    if (!client.registered) {
+        sendReply(fd, "451 :You have not registered\r\n");
+        return;
+    }
+    
+    sendReply(fd, "321 " + client.nickname + " Channel :Users  Name\r\n");
+    
+    for (std::map<std::string, std::set<int> >::iterator it = _channels.begin(); 
+         it != _channels.end(); ++it) {
+        std::ostringstream oss;
+        oss << it->second.size();
+        sendReply(fd, "322 " + client.nickname + " " + it->first + " " + 
+                 oss.str() + " :No topic\r\n");
+    }
+    
+    sendReply(fd, "323 " + client.nickname + " :End of LIST\r\n");
+}
