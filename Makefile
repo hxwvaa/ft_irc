@@ -9,7 +9,8 @@ NAME = ircserv
 
 # Source files
 SRCS = main.cpp \
-       Server.cpp
+       Server.cpp \
+	   client.cpp \
 
 # Object files
 OBJS = $(SRCS:.cpp=.o)
