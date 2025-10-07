@@ -8,9 +8,11 @@ CXXFLAGS = -Wall -Wextra -Werror -std=c++98
 NAME = ircserv
 
 # Source files
-SRCS = main.cpp \
-       Server.cpp \
+SRCS = Server.cpp \
 	   client.cpp \
+	   parser.cpp \
+	   hxwva-main.cpp\
+# 	   main.cpp
 
 # Object files
 OBJS = $(SRCS:.cpp=.o)
