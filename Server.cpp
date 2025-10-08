@@ -19,9 +19,9 @@ void Server::signalHandler(int signum) {
     (void)signum;
     g_server_running = false;
 }
-
+//Added _parcer(this) -- Addition from Parsing
 Server::Server(int port, const std::string &password)
-    : _port(port), _password(password), _sockfd(-1) {
+    : _port(port), _password(password), _sockfd(-1), _parcer(this) {
     std::cout << "IRC Server starting on port " << _port << std::endl;
     signal(SIGINT, Server::signalHandler);
     signal(SIGQUIT, Server::signalHandler);
@@ -174,88 +174,96 @@ void Server::removeClient(int fd) {
     }
 }
 
+// COMMENTING THEM OUT FOR PARSING ADDITIONS AND TESTING 
+
+// void Server::processMessage(int fd, const std::string& message) {
+//     std::vector<std::string> tokens = parseMessage(message);
+//     if (tokens.empty()) return;
+
+//     std::string command = tokens[0];
+//     std::transform(command.begin(), command.end(), command.begin(), ::toupper);
+//     std::vector<std::string> params(tokens.begin() + 1, tokens.end());
+
+//     std::cout << "Client " << fd << ": " << command;
+//     for (size_t i = 0; i < params.size(); ++i) {
+//         std::cout << " [" << params[i] << "]";
+//     }
+//     std::cout << std::endl;
+
+//     // Handle IRC commands that irssi and other clients use
+//     if (command == "PASS") {
+//         handlePass(fd, params);
+//     } else if (command == "NICK") {
+//         handleNick(fd, params);
+//     } else if (command == "USER") {
+//         handleUser(fd, params);
+//     } else if (command == "JOIN") {
+//         handleJoin(fd, params);
+//     } else if (command == "PRIVMSG") {
+//         handlePrivMsg(fd, params);
+//     } else if (command == "QUIT") {
+//         handleQuit(fd, params);
+//     } else if (command == "PING") {
+//         handlePing(fd, params);
+//     } else if (command == "PART") {
+//         handlePart(fd, params);
+//     } else if (command == "MODE") {
+//         handleMode(fd, params);
+//     } else if (command == "WHO") {
+//         handleWho(fd, params);
+//     } else if (command == "LIST") {
+//         handleList(fd, params);
+//     } else if (command == "TOPIC") {
+//         // Handle TOPIC command
+//         ClientInfo& client = _clients[fd];
+//         if (!client.registered) {
+//             sendReply(fd, "451 :You have not registered\\r\\n");
+//             return;
+//         }
+//         if (params.empty()) {
+//             sendReply(fd, "461 TOPIC :Not enough parameters\\r\\n");
+//             return;
+//         }
+//         std::string channel = params[0];
+//         if (params.size() > 1) {
+//             // Set topic (just acknowledge for now)
+//             sendReply(fd, "332 " + client.nickname + " " + channel + " :" + params[1] + "\\r\\n");
+//         } else {
+//             // Get topic (no topic set)
+//             sendReply(fd, "331 " + client.nickname + " " + channel + " :No topic is set\\r\\n");
+//         }
+//     } else if (command == "NAMES") {
+//         // Handle NAMES command  
+//         ClientInfo& client = _clients[fd];
+//         if (!client.registered) {
+//             sendReply(fd, "451 :You have not registered\\r\\n");
+//             return;
+//         }
+//         if (!params.empty()) {
+//             std::string channel = params[0];
+//             if (_channels.find(channel) != _channels.end()) {
+//                 std::string names = "";
+//                 for (std::set<int>::iterator it = _channels[channel].begin(); 
+//                      it != _channels[channel].end(); ++it) {
+//                     if (!names.empty()) names += " ";
+//                     names += _clients[*it].nickname;
+//                 }
+//                 sendReply(fd, "353 " + client.nickname + " = " + channel + " :" + names + "\\r\\n");
+//             }
+//             sendReply(fd, "366 " + client.nickname + " " + channel + " :End of NAMES list\\r\\n");
+//         }
+//     } else if (command == "NOTICE") {
+//         // Handle NOTICE command (similar to PRIVMSG but no auto-replies)
+//         handlePrivMsg(fd, params); // For simplicity, treat like PRIVMSG
+//     } else {
+//         sendReply(fd, "421 " + command + " :Unknown command\\r\\n");
+//     }
+// }
+
 void Server::processMessage(int fd, const std::string& message) {
-    std::vector<std::string> tokens = parseMessage(message);
-    if (tokens.empty()) return;
-
-    std::string command = tokens[0];
-    std::transform(command.begin(), command.end(), command.begin(), ::toupper);
-    std::vector<std::string> params(tokens.begin() + 1, tokens.end());
-
-    std::cout << "Client " << fd << ": " << command;
-    for (size_t i = 0; i < params.size(); ++i) {
-        std::cout << " [" << params[i] << "]";
-    }
-    std::cout << std::endl;
-
-    // Handle IRC commands that irssi and other clients use
-    if (command == "PASS") {
-        handlePass(fd, params);
-    } else if (command == "NICK") {
-        handleNick(fd, params);
-    } else if (command == "USER") {
-        handleUser(fd, params);
-    } else if (command == "JOIN") {
-        handleJoin(fd, params);
-    } else if (command == "PRIVMSG") {
-        handlePrivMsg(fd, params);
-    } else if (command == "QUIT") {
-        handleQuit(fd, params);
-    } else if (command == "PING") {
-        handlePing(fd, params);
-    } else if (command == "PART") {
-        handlePart(fd, params);
-    } else if (command == "MODE") {
-        handleMode(fd, params);
-    } else if (command == "WHO") {
-        handleWho(fd, params);
-    } else if (command == "LIST") {
-        handleList(fd, params);
-    } else if (command == "TOPIC") {
-        // Handle TOPIC command
-        ClientInfo& client = _clients[fd];
-        if (!client.registered) {
-            sendReply(fd, "451 :You have not registered\\r\\n");
-            return;
-        }
-        if (params.empty()) {
-            sendReply(fd, "461 TOPIC :Not enough parameters\\r\\n");
-            return;
-        }
-        std::string channel = params[0];
-        if (params.size() > 1) {
-            // Set topic (just acknowledge for now)
-            sendReply(fd, "332 " + client.nickname + " " + channel + " :" + params[1] + "\\r\\n");
-        } else {
-            // Get topic (no topic set)
-            sendReply(fd, "331 " + client.nickname + " " + channel + " :No topic is set\\r\\n");
-        }
-    } else if (command == "NAMES") {
-        // Handle NAMES command  
-        ClientInfo& client = _clients[fd];
-        if (!client.registered) {
-            sendReply(fd, "451 :You have not registered\\r\\n");
-            return;
-        }
-        if (!params.empty()) {
-            std::string channel = params[0];
-            if (_channels.find(channel) != _channels.end()) {
-                std::string names = "";
-                for (std::set<int>::iterator it = _channels[channel].begin(); 
-                     it != _channels[channel].end(); ++it) {
-                    if (!names.empty()) names += " ";
-                    names += _clients[*it].nickname;
-                }
-                sendReply(fd, "353 " + client.nickname + " = " + channel + " :" + names + "\\r\\n");
-            }
-            sendReply(fd, "366 " + client.nickname + " " + channel + " :End of NAMES list\\r\\n");
-        }
-    } else if (command == "NOTICE") {
-        // Handle NOTICE command (similar to PRIVMSG but no auto-replies)
-        handlePrivMsg(fd, params); // For simplicity, treat like PRIVMSG
-    } else {
-        sendReply(fd, "421 " + command + " :Unknown command\\r\\n");
-    }
+    IRCCommand cmd = _parcer.parse(message);
+    if (!cmd.command.empty())
+        _parcer.handle(fd, cmd);
 }
 
 std::vector<std::string> Server::parseMessage(const std::string& message) {
@@ -655,4 +663,159 @@ void Server::handleList(int fd, const std::vector<std::string>& params) {
     }
     
     sendReply(fd, "323 " + client.nickname + " :End of LIST\r\n");
+}
+
+// Addition from Parsing 
+// IDENTITY/ PASSWORD
+
+const std::string& Server::serverName() const {
+    static std::string name("ircserver");
+    return name;
+}
+const std::string& Server::serverPassword() const { return _password; }
+
+// CLIENT STATE
+bool Server::hasClient(int fd) const { return _clients.find(fd) != _clients.end(); }
+
+bool Server::isRegistered(int fd) const { return _clients.find(fd)->second.registered; }
+void Server::setRegistered(int fd, bool v) { _clients[fd].registered = v; }
+
+const std::string& Server::getNick(int fd) const { return _clients.find(fd)->second.nickname; }
+void Server::setNick(int fd, const std::string& nick) { _clients[fd].nickname = nick; }
+
+const std::string& Server::getUser(int fd) const { return _clients.find(fd)->second.username; }
+void Server::setUser(int fd, const std::string& user) { _clients[fd].username = user; }
+
+const std::string& Server::getRealname(int fd) const { return _clients.find(fd)->second.realname; }
+void Server::setRealname(int fd, const std::string& rn) { _clients[fd].realname = rn; }
+
+bool Server::checkPasswordGiven(int fd) const { return _clients.find(fd)->second.authenticated; }
+void Server::setPasswordGiven(int fd, bool v) { _clients[fd].authenticated = v; }
+
+bool Server::isOper(int) const { return false; }
+void Server::setOper(int, bool) {}
+
+// NICK LOOKUP / VALIDATION
+bool Server::isValidNick(const std::string& nick) const {
+    // return isValidNickname(nick); // reuse your existing helper
+    return Server::isValidNickname(nick);
+}
+int Server::fdByNick(const std::string& nick) const {
+    for (std::map<int, ClientInfo>::const_iterator it = _clients.begin(); it != _clients.end(); ++it)
+        if (it->second.nickname == nick) return it->first;
+    return -1;
+}
+
+// CHANNELS
+bool Server::channelExists(const std::string& name) const {
+    return _channels.find(name) != _channels.end();
+}
+void Server::createChannel(const std::string& name, int /*creatorFd*/) {
+    _channels[name];                 // ensure set exists
+    _chanTopic[name] = "";
+    if (_chanLimit.find(name) == _chanLimit.end()) _chanLimit[name] = 0;
+}
+bool Server::isInChannel(int fd, const std::string& name) const {
+    std::map<std::string, std::set<int> >::const_iterator it = _channels.find(name);
+    if (it == _channels.end()) return false;
+    return it->second.find(fd) != it->second.end();
+}
+void Server::joinChannel(int fd, const std::string& name) {
+    _channels[name].insert(fd);
+    _clients[fd].channels.insert(name);
+    if (_channels[name].size() == 1) _chanOps[name].insert(fd); // first user is op
+}
+void Server::partChannel(int fd, const std::string& name, const std::string& /*reason*/) {
+    _channels[name].erase(fd);
+    _clients[fd].channels.erase(name);
+    _chanOps[name].erase(fd);
+    if (_channels[name].empty()) {
+        _channels.erase(name);
+        _chanTopic.erase(name);
+        _chanOps.erase(name);
+        _chanKey.erase(name);
+        _chanLimit.erase(name);
+        _mode_i.erase(name);
+        _mode_t.erase(name);
+        _invites.erase(name);
+    }
+}
+bool Server::isChanOper(int fd, const std::string& name) const {
+    std::map<std::string, std::set<int> >::const_iterator it = _chanOps.find(name);
+    if (it == _chanOps.end()) return false;
+    return it->second.find(fd) != it->second.end();
+}
+void Server::setChanOper(int /*byFd*/, const std::string& name, int targetFd, bool v) {
+    if (v) _chanOps[name].insert(targetFd);
+    else   _chanOps[name].erase(targetFd);
+}
+const std::set<int>& Server::channelMembers(const std::string& name) const {
+    return _channels.find(name)->second; // safe: parser only calls when exists
+}
+
+// TOPIC/MODES/KEY/LIMIT/INVITE
+
+const std::string& Server::getTopic(const std::string& name) const {
+    static std::string empty;
+    std::map<std::string,std::string>::const_iterator it = _chanTopic.find(name);
+    return it==_chanTopic.end()? empty : it->second;
+}
+void Server::setTopic(const std::string& name, const std::string& topic) { _chanTopic[name] = topic; }
+
+bool Server::mode_i(const std::string& name) const { return _mode_i.find(name) != _mode_i.end(); }
+void Server::set_mode_i(const std::string& name, bool v) { if (v) _mode_i.insert(name); else _mode_i.erase(name); }
+
+bool Server::mode_t(const std::string& name) const { return _mode_t.find(name) != _mode_t.end(); }
+void Server::set_mode_t(const std::string& name, bool v) { if (v) _mode_t.insert(name); else _mode_t.erase(name); }
+
+bool Server::has_key(const std::string& name) const { return _chanKey.find(name) != _chanKey.end(); }
+const std::string& Server::key(const std::string& name) const { return _chanKey.find(name)->second; }
+void Server::set_key(const std::string& name, const std::string& k) { _chanKey[name] = k; }
+void Server::unset_key(const std::string& name) { _chanKey.erase(name); }
+
+int Server::limit(const std::string& name) const {
+    std::map<std::string,int>::const_iterator it = _chanLimit.find(name);
+    return it==_chanLimit.end()? 0 : it->second;
+}
+void Server::set_limit(const std::string& name, int n) { _chanLimit[name] = n; }
+
+bool Server::isInvited(const std::string& name, int fd) const {
+    std::map<std::string,std::set<int> >::const_iterator it = _invites.find(name);
+    if (it == _invites.end()) return false;
+    return it->second.find(fd) != it->second.end();
+}
+void Server::addInvite(const std::string& name, int fd) { _invites[name].insert(fd); }
+void Server::removeInvite(const std::string& name, int fd) { _invites[name].erase(fd); }
+
+// MESSAGING + LIST
+
+void Server::sendToFd(int fd, const std::string& msg) { sendReply(fd, msg); }
+
+// 3-digit padding helper
+static std::string _pad3(int code) {
+    char b[4]; b[3]='\0';
+    b[2] = char('0' + (code % 10));
+    b[1] = char('0' + ((code / 10) % 10));
+    b[0] = char('0' + ((code / 100) % 10));
+    return std::string(b);
+}
+
+void Server::sendNumeric(int fd, int code, const std::string& suffix) {
+    const ClientInfo& c = _clients[fd];
+    const std::string& nick = c.nickname.empty() ? std::string("*") : c.nickname;
+    std::string line = ":" + serverName() + " " + _pad3(code) + " " + nick + " " + suffix + "\r\n";
+    sendReply(fd, line);
+}
+
+void Server::noticeToFd(int fd, const std::string& msg) { sendReply(fd, msg); }
+
+std::vector<std::string> Server::listChannels() const {
+    std::vector<std::string> out;
+    for (std::map<std::string, std::set<int> >::const_iterator it = _channels.begin(); it != _channels.end(); ++it)
+        out.push_back(it->first);
+    return out;
+}
+size_t Server::channelSize(const std::string& name) const {
+    std::map<std::string, std::set<int> >::const_iterator it = _channels.find(name);
+    return it==_channels.end()? 0 : it->second.size();
 }

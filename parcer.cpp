@@ -1,5 +1,5 @@
 
-#include "parser.hpp"
+#include "parcer.hpp"
 #include <algorithm>
 #include <cctype>
 #include <sstream>
@@ -157,12 +157,10 @@ void Parcer::do_PASS(int fd, const std::vector<std::string>& P) {
 void Parcer::do_NICK(int fd, const std::vector<std::string>& P) {
     if (P.empty()) { _A->sendNumeric(fd, 431, ":No nickname given"); return; }
     std::string newNick = P[0];
-    if (!_A->isValidNick(newNick)) { _A->sendNumeric(fd, 432, newNick + " :Erroneous nickname"); return; }
-
+    
     if (!isValidNicknameLocal(newNick)) { _A->sendNumeric(fd, 432, newNick + " :Erroneous nickname"); return; }
-    // (optional) also check adapter if you want both to agree:
+    // (optional)
     if (!_A->isValidNick(newNick)) { _A->sendNumeric(fd, 432, newNick + " :Erroneous nickname"); return; }
-
 
     int other = _A->fdByNick(newNick);
     if (other!=-1 && other!=fd) { _A->sendNumeric(fd, 433, newNick + " :Nickname is already in use"); return; }

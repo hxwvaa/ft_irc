@@ -10,7 +10,7 @@ NAME = ircserv
 # Source files
 SRCS = Server.cpp \
 	   client.cpp \
-	   parser.cpp \
+	   parcer.cpp \
 	   hxwva-main.cpp\
 # 	   main.cpp
 
