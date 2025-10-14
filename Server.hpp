@@ -59,7 +59,6 @@ private:
     void handleList(int fd, const std::vector<std::string>& params);
     
     std::vector<std::string> parseMessage(const std::string& message);
-    std::string extractCommand(const std::string& message);
     bool isValidNickname(const std::string& nick);
     static void signalHandler(int signum);
 };

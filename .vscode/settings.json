@@ -1,3 +1,9 @@
 {
-    "github.copilot.chat.agent.thinkingTool": true
+    "github.copilot.chat.agent.thinkingTool": true,
+    "files.associations": {
+        "xlocmes": "cpp",
+        "vector": "cpp",
+        "iostream": "cpp",
+        "algorithm": "cpp"
+    }
 }
