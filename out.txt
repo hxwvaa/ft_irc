@@ -1,0 +1,527 @@
+[2J[H************************************************************
+*                                                          *
+*    ft_irc Interactive Test Console                       *
+*                                                          *
+************************************************************
+
+Welcome to the ft_irc Interactive Test Console!
+Here you can manually test your IRC server functionality.
+
+------------------------------------------------------------
+                        MAIN MENU
+------------------------------------------------------------
+ 1. Server Management
+ 2. Client Management
+ 3. Channel Operations
+ 4. Send IRC Commands
+ 5. View Server State
+ 6. Run Automated Tests
+ 7. Clear Screen
+ 0. Exit
+------------------------------------------------------------
+Enter your choice: 
+============================================================
+ SERVER MANAGEMENT
+============================================================
+No server running. Let's create one!
+Enter server name (default: ft_irc): Enter server password (default: testpass): 
+✅ Server 'test' created successfully!
+Password: test
+
+Press Enter to continue...
+------------------------------------------------------------
+                        MAIN MENU
+------------------------------------------------------------
+ 1. Server Management
+ 2. Client Management
+ 3. Channel Operations
+ 4. Send IRC Commands
+ 5. View Server State
+ 6. Run Automated Tests
+ 7. Clear Screen
+ 0. Exit
+------------------------------------------------------------
+Enter your choice: 
+Available automated tests:
+ 1. Basic IRC Flow Test
+ 2. Error Handling Test
+ 3. Performance Test
+ 4. Run All Tests
+ 0. Back to main menu
+
+Choice: 
+============================================================
+ BASIC IRC SERVER FUNCTIONALITY TEST
+============================================================
+
+============================================================
+ TEST 1: Client Registration
+============================================================
+
+>> Client alice connecting (fd: 4)...
+Client connected with fd: 4
+>> alice authenticating...
+Processing message from fd 4: PASS testpass
+Processing message from fd 4: NICK alice
+Processing message from fd 4: USER alice 0 * :Alice Wonderland
+[4->alice] :ft_irc 1 alice ft_irc :Welcome to the IRC network alice
+[4->alice] :ft_irc 2 alice :Your host is ft_irc
+[4->alice] :ft_irc 3 alice :This server was created just now
+>> alice registration complete!
+
+>> Client bob connecting (fd: 5)...
+Client connected with fd: 5
+>> bob authenticating...
+Processing message from fd 5: PASS testpass
+Processing message from fd 5: NICK bob
+Processing message from fd 5: USER bob 0 * :Bob Builder
+[5->bob] :ft_irc 1 bob ft_irc :Welcome to the IRC network bob
+[5->bob] :ft_irc 2 bob :Your host is ft_irc
+[5->bob] :ft_irc 3 bob :This server was created just now
+>> bob registration complete!
+
+>> Client charlie connecting (fd: 6)...
+Client connected with fd: 6
+>> charlie authenticating...
+Processing message from fd 6: PASS testpass
+Processing message from fd 6: NICK charlie
+Processing message from fd 6: USER charlie 0 * :Charlie Brown
+[6->charlie] :ft_irc 1 charlie ft_irc :Welcome to the IRC network charlie
+[6->charlie] :ft_irc 2 charlie :Your host is ft_irc
+[6->charlie] :ft_irc 3 charlie :This server was created just now
+>> charlie registration complete!
+
+Server Status after registrations:
+=== All Clients ===
+Client fd 4: nick='alice', user='alice', real='Alice Wonderland', registered=1, auth=0
+Client fd 5: nick='bob', user='bob', real='Bob Builder', registered=1, auth=0
+Client fd 6: nick='charlie', user='charlie', real='Charlie Brown', registered=1, auth=0
+
+============================================================
+ TEST 2: Channel Operations
+============================================================
+>> alice creates and joins #general
+Processing message from fd 4: JOIN #general
+[4->alice] :alice JOIN :#general
+[4->alice] :ft_irc 353 alice = #general :@alice 
+[4->alice] :ft_irc 366 alice #general :End of /NAMES list.
+
+>> bob joins #general
+Processing message from fd 5: JOIN #general
+[4->alice] :bob JOIN :#general
+[5->bob] :bob JOIN :#general
+[5->bob] :ft_irc 353 bob = #general :@alice bob 
+[5->bob] :ft_irc 366 bob #general :End of /NAMES list.
+
+>> charlie joins #general
+Processing message from fd 6: JOIN #general
+[4->alice] :charlie JOIN :#general
+[5->bob] :charlie JOIN :#general
+[6->charlie] :charlie JOIN :#general
+[6->charlie] :ft_irc 353 charlie = #general :@alice bob charlie 
+[6->charlie] :ft_irc 366 charlie #general :End of /NAMES list.
+
+>> alice creates #private channel
+Processing message from fd 4: JOIN #private
+[4->alice] :alice JOIN :#private
+[4->alice] :ft_irc 353 alice = #private :@alice 
+[4->alice] :ft_irc 366 alice #private :End of /NAMES list.
+=== All Channels ===
+Channel #general: topic='', members=3, operators=1, inviteOnly=0, topicProtected=0
+  - alice (operator)
+  - bob
+  - charlie
+Channel #private: topic='', members=1, operators=1, inviteOnly=0, topicProtected=0
+  - alice (operator)
+
+============================================================
+ TEST 3: Channel Communication
+============================================================
+>> alice sends welcome message to #general
+Processing message from fd 4: PRIVMSG #general :Hello everyone! Welcome to our IRC server!
+[4->alice] :alice PRIVMSG #general :Hello everyone! Welcome to our IRC server!
+[5->bob] :alice PRIVMSG #general :Hello everyone! Welcome to our IRC server!
+[6->charlie] :alice PRIVMSG #general :Hello everyone! Welcome to our IRC server!
+
+>> bob responds in #general
+Processing message from fd 5: PRIVMSG #general :Hey alice! Thanks for setting this up!
+[4->alice] :bob PRIVMSG #general :Hey alice! Thanks for setting this up!
+[5->bob] :bob PRIVMSG #general :Hey alice! Thanks for setting this up!
+[6->charlie] :bob PRIVMSG #general :Hey alice! Thanks for setting this up!
+
+>> charlie joins the conversation
+Processing message from fd 6: PRIVMSG #general :Hi all! Great to be here :)
+[4->alice] :charlie PRIVMSG #general :Hi all! Great to be here :)
+[5->bob] :charlie PRIVMSG #general :Hi all! Great to be here :)
+[6->charlie] :charlie PRIVMSG #general :Hi all! Great to be here :)
+
+============================================================
+ TEST 4: Private Messages
+============================================================
+>> alice sends private message to bob
+Processing message from fd 4: PRIVMSG bob :Can you help me set up the channel modes?
+[5->bob] :alice PRIVMSG bob :Can you help me set up the channel modes?
+
+
+>> bob replies privately to alice
+Processing message from fd 5: PRIVMSG alice :Sure! I'll show you how to use MODE commands.
+[4->alice] :bob PRIVMSG alice :Sure! I'll show you how to use MODE commands.
+
+
+============================================================
+ TEST 5: Channel Management & Modes
+============================================================
+>> alice sets topic for #general
+Processing message from fd 4: TOPIC #general :Welcome to ft_irc - A C++ IRC Server Implementation
+[4->alice] :alice TOPIC #general :Welcome to ft_irc - A C++ IRC Server Implementation
+[5->bob] :alice TOPIC #general :Welcome to ft_irc - A C++ IRC Server Implementation
+[6->charlie] :alice TOPIC #general :Welcome to ft_irc - A C++ IRC Server Implementation
+
+>> alice makes bob an operator
+Processing message from fd 4: MODE #general +o bob
+[4->alice] :alice MODE #general +o
+[5->bob] :alice MODE #general +o
+[6->charlie] :alice MODE #general +o
+
+>> alice enables topic protection
+Processing message from fd 4: MODE #general +t
+[4->alice] :alice MODE #general +t
+[5->bob] :alice MODE #general +t
+[6->charlie] :alice MODE #general +t
+
+>> bob tries to set channel to invite-only
+Processing message from fd 5: MODE #general +i
+[4->alice] :bob MODE #general +i
+[5->bob] :bob MODE #general +i
+[6->charlie] :bob MODE #general +i
+Channel #general: topic='Welcome to ft_irc - A C++ IRC Server Implementation', members=3, operators=2, inviteOnly=1, topicProtected=1
+  - alice (operator)
+  - bob (operator)
+  - charlie
+
+============================================================
+ TEST 6: Advanced Features
+============================================================
+>> alice invites charlie to #private
+Processing message from fd 4: INVITE charlie #private
+[6->charlie] :alice INVITE charlie :#private
+
+[4->alice] :ft_irc 341 alice charlie #private
+
+>> charlie joins #private after invitation
+Processing message from fd 6: JOIN #private
+[4->alice] :charlie JOIN :#private
+[6->charlie] :charlie JOIN :#private
+[6->charlie] :ft_irc 353 charlie = #private :@alice charlie 
+[6->charlie] :ft_irc 366 charlie #private :End of /NAMES list.
+
+>> alice sets a channel key (password)
+Processing message from fd 4: MODE #private +k secretkey
+[4->alice] :alice MODE #private +k
+[6->charlie] :alice MODE #private +k
+Channel #private: topic='', members=2, operators=1, inviteOnly=0, topicProtected=0
+  - alice (operator)
+  - charlie
+
+============================================================
+ TEST 7: Client Departure
+============================================================
+>> charlie leaves #general with a message
+Processing message from fd 6: PART #general :Going to focus on the private channel
+[4->alice] :charlie PART #general :Going to focus on the private channel
+[5->bob] :charlie PART #general :Going to focus on the private channel
+[6->charlie] :charlie PART #general :Going to focus on the private channel
+
+>> bob checks who's still in #general
+Processing message from fd 5: WHO #general
+[5->bob] :ft_irc 352 bob #general alice host ft_irc alice H :0 Alice Wonderland
+[5->bob] :ft_irc 352 bob #general bob host ft_irc bob H :0 Bob Builder
+[5->bob] :ft_irc 315 bob #general :End of /WHO list.
+
+>> charlie quits the server
+Processing message from fd 6: QUIT :Thanks for the test session!
+[6->charlie] :ft_irc 221 charlie :Closing Link: charlie (Thanks for the test session!)
+
+Final server state:
+=== All Clients ===
+Client fd 4: nick='alice', user='alice', real='Alice Wonderland', registered=1, auth=0
+Client fd 5: nick='bob', user='bob', real='Bob Builder', registered=1, auth=0
+Client fd 6: nick='charlie', user='charlie', real='Charlie Brown', registered=1, auth=0
+=== All Channels ===
+Channel #general: topic='Welcome to ft_irc - A C++ IRC Server Implementation', members=2, operators=2, inviteOnly=1, topicProtected=1
+  - alice (operator)
+  - bob (operator)
+Channel #private: topic='', members=2, operators=1, inviteOnly=0, topicProtected=0
+  - alice (operator)
+  - charlie
+
+============================================================
+ ERROR HANDLING & EDGE CASES TEST
+============================================================
+>> Testing commands from unregistered client...
+Client connected with fd: 10
+Processing message from fd 10: JOIN #test
+[10->] :ft_irc_test 451  :You have not registered
+Processing message from fd 10: PRIVMSG #test :Hello
+[10->] :ft_irc_test 403  #test :No such channel
+
+>> Testing wrong password...
+Client connected with fd: 11
+Processing message from fd 11: PASS wrongpassword
+[11->] :ft_irc_test 464  :Password incorrect
+Processing message from fd 11: NICK testuser
+Processing message from fd 11: USER test 0 * :Test User
+
+>> Testing duplicate nicknames...
+Client connected with fd: 12
+Processing message from fd 12: PASS secret123
+Processing message from fd 12: NICK alice
+
+>> Testing invalid channel operations...
+Client connected with fd: 13
+Processing message from fd 13: PASS secret123
+Processing message from fd 13: NICK validuser
+Processing message from fd 13: USER valid 0 * :Valid User
+[13->validuser] :ft_irc_test 1 validuser ft_irc_test :Welcome to the IRC network validuser
+[13->validuser] :ft_irc_test 2 validuser :Your host is ft_irc_test
+[13->validuser] :ft_irc_test 3 validuser :This server was created just now
+Processing message from fd 13: JOIN invalidchannel
+[13->validuser] :ft_irc_test 403 validuser invalidchannel :No such channel
+Processing message from fd 13: JOIN #
+[13->validuser] :ft_irc_test 403 validuser # :No such channel
+=== All Clients ===
+Client fd 10: nick='', user='', real='', registered=0, auth=0
+Client fd 11: nick='testuser', user='test', real='Test User', registered=0, auth=0
+Client fd 12: nick='alice', user='', real='', registered=0, auth=0
+Client fd 13: nick='validuser', user='valid', real='Valid User', registered=1, auth=0
+
+============================================================
+ PERFORMANCE & STRESS TEST
+============================================================
+>> Creating multiple clients and channels...
+Client connected with fd: 20
+Processing message from fd 20: PASS load123
+Processing message from fd 20: NICK user20
+Processing message from fd 20: USER user20 0 * :Test User 20
+[20->user20] :stress_test 1 user20 stress_test :Welcome to the IRC network user20
+[20->user20] :stress_test 2 user20 :Your host is stress_test
+[20->user20] :stress_test 3 user20 :This server was created just now
+Client connected with fd: 21
+Processing message from fd 21: PASS load123
+Processing message from fd 21: NICK user21
+Processing message from fd 21: USER user21 0 * :Test User 21
+[21->user21] :stress_test 1 user21 stress_test :Welcome to the IRC network user21
+[21->user21] :stress_test 2 user21 :Your host is stress_test
+[21->user21] :stress_test 3 user21 :This server was created just now
+Client connected with fd: 22
+Processing message from fd 22: PASS load123
+Processing message from fd 22: NICK user22
+Processing message from fd 22: USER user22 0 * :Test User 22
+[22->user22] :stress_test 1 user22 stress_test :Welcome to the IRC network user22
+[22->user22] :stress_test 2 user22 :Your host is stress_test
+[22->user22] :stress_test 3 user22 :This server was created just now
+Client connected with fd: 23
+Processing message from fd 23: PASS load123
+Processing message from fd 23: NICK user23
+Processing message from fd 23: USER user23 0 * :Test User 23
+[23->user23] :stress_test 1 user23 stress_test :Welcome to the IRC network user23
+[23->user23] :stress_test 2 user23 :Your host is stress_test
+[23->user23] :stress_test 3 user23 :This server was created just now
+Client connected with fd: 24
+Processing message from fd 24: PASS load123
+Processing message from fd 24: NICK user24
+Processing message from fd 24: USER user24 0 * :Test User 24
+[24->user24] :stress_test 1 user24 stress_test :Welcome to the IRC network user24
+[24->user24] :stress_test 2 user24 :Your host is stress_test
+[24->user24] :stress_test 3 user24 :This server was created just now
+Client connected with fd: 25
+Processing message from fd 25: PASS load123
+Processing message from fd 25: NICK user25
+Processing message from fd 25: USER user25 0 * :Test User 25
+[25->user25] :stress_test 1 user25 stress_test :Welcome to the IRC network user25
+[25->user25] :stress_test 2 user25 :Your host is stress_test
+[25->user25] :stress_test 3 user25 :This server was created just now
+Client connected with fd: 26
+Processing message from fd 26: PASS load123
+Processing message from fd 26: NICK user26
+Processing message from fd 26: USER user26 0 * :Test User 26
+[26->user26] :stress_test 1 user26 stress_test :Welcome to the IRC network user26
+[26->user26] :stress_test 2 user26 :Your host is stress_test
+[26->user26] :stress_test 3 user26 :This server was created just now
+Client connected with fd: 27
+Processing message from fd 27: PASS load123
+Processing message from fd 27: NICK user27
+Processing message from fd 27: USER user27 0 * :Test User 27
+[27->user27] :stress_test 1 user27 stress_test :Welcome to the IRC network user27
+[27->user27] :stress_test 2 user27 :Your host is stress_test
+[27->user27] :stress_test 3 user27 :This server was created just now
+Client connected with fd: 28
+Processing message from fd 28: PASS load123
+Processing message from fd 28: NICK user28
+Processing message from fd 28: USER user28 0 * :Test User 28
+[28->user28] :stress_test 1 user28 stress_test :Welcome to the IRC network user28
+[28->user28] :stress_test 2 user28 :Your host is stress_test
+[28->user28] :stress_test 3 user28 :This server was created just now
+Client connected with fd: 29
+Processing message from fd 29: PASS load123
+Processing message from fd 29: NICK user29
+Processing message from fd 29: USER user29 0 * :Test User 29
+[29->user29] :stress_test 1 user29 stress_test :Welcome to the IRC network user29
+[29->user29] :stress_test 2 user29 :Your host is stress_test
+[29->user29] :stress_test 3 user29 :This server was created just now
+>> All clients joining #lobby...
+Processing message from fd 20: JOIN #lobby
+[20->user20] :user20 JOIN :#lobby
+[20->user20] :stress_test 353 user20 = #lobby :@user20 
+[20->user20] :stress_test 366 user20 #lobby :End of /NAMES list.
+Processing message from fd 21: JOIN #lobby
+[20->user20] :user21 JOIN :#lobby
+[21->user21] :user21 JOIN :#lobby
+[21->user21] :stress_test 353 user21 = #lobby :@user20 user21 
+[21->user21] :stress_test 366 user21 #lobby :End of /NAMES list.
+Processing message from fd 22: JOIN #lobby
+[20->user20] :user22 JOIN :#lobby
+[21->user21] :user22 JOIN :#lobby
+[22->user22] :user22 JOIN :#lobby
+[22->user22] :stress_test 353 user22 = #lobby :@user20 user21 user22 
+[22->user22] :stress_test 366 user22 #lobby :End of /NAMES list.
+Processing message from fd 23: JOIN #lobby
+[20->user20] :user23 JOIN :#lobby
+[21->user21] :user23 JOIN :#lobby
+[22->user22] :user23 JOIN :#lobby
+[23->user23] :user23 JOIN :#lobby
+[23->user23] :stress_test 353 user23 = #lobby :@user20 user21 user22 user23 
+[23->user23] :stress_test 366 user23 #lobby :End of /NAMES list.
+Processing message from fd 24: JOIN #lobby
+[20->user20] :user24 JOIN :#lobby
+[21->user21] :user24 JOIN :#lobby
+[22->user22] :user24 JOIN :#lobby
+[23->user23] :user24 JOIN :#lobby
+[24->user24] :user24 JOIN :#lobby
+[24->user24] :stress_test 353 user24 = #lobby :@user20 user21 user22 user23 user24 
+[24->user24] :stress_test 366 user24 #lobby :End of /NAMES list.
+Processing message from fd 25: JOIN #lobby
+[20->user20] :user25 JOIN :#lobby
+[21->user21] :user25 JOIN :#lobby
+[22->user22] :user25 JOIN :#lobby
+[23->user23] :user25 JOIN :#lobby
+[24->user24] :user25 JOIN :#lobby
+[25->user25] :user25 JOIN :#lobby
+[25->user25] :stress_test 353 user25 = #lobby :@user20 user21 user22 user23 user24 user25 
+[25->user25] :stress_test 366 user25 #lobby :End of /NAMES list.
+Processing message from fd 26: JOIN #lobby
+[20->user20] :user26 JOIN :#lobby
+[21->user21] :user26 JOIN :#lobby
+[22->user22] :user26 JOIN :#lobby
+[23->user23] :user26 JOIN :#lobby
+[24->user24] :user26 JOIN :#lobby
+[25->user25] :user26 JOIN :#lobby
+[26->user26] :user26 JOIN :#lobby
+[26->user26] :stress_test 353 user26 = #lobby :@user20 user21 user22 user23 user24 user25 user26 
+[26->user26] :stress_test 366 user26 #lobby :End of /NAMES list.
+Processing message from fd 27: JOIN #lobby
+[20->user20] :user27 JOIN :#lobby
+[21->user21] :user27 JOIN :#lobby
+[22->user22] :user27 JOIN :#lobby
+[23->user23] :user27 JOIN :#lobby
+[24->user24] :user27 JOIN :#lobby
+[25->user25] :user27 JOIN :#lobby
+[26->user26] :user27 JOIN :#lobby
+[27->user27] :user27 JOIN :#lobby
+[27->user27] :stress_test 353 user27 = #lobby :@user20 user21 user22 user23 user24 user25 user26 user27 
+[27->user27] :stress_test 366 user27 #lobby :End of /NAMES list.
+Processing message from fd 28: JOIN #lobby
+[20->user20] :user28 JOIN :#lobby
+[21->user21] :user28 JOIN :#lobby
+[22->user22] :user28 JOIN :#lobby
+[23->user23] :user28 JOIN :#lobby
+[24->user24] :user28 JOIN :#lobby
+[25->user25] :user28 JOIN :#lobby
+[26->user26] :user28 JOIN :#lobby
+[27->user27] :user28 JOIN :#lobby
+[28->user28] :user28 JOIN :#lobby
+[28->user28] :stress_test 353 user28 = #lobby :@user20 user21 user22 user23 user24 user25 user26 user27 user28 
+[28->user28] :stress_test 366 user28 #lobby :End of /NAMES list.
+Processing message from fd 29: JOIN #lobby
+[20->user20] :user29 JOIN :#lobby
+[21->user21] :user29 JOIN :#lobby
+[22->user22] :user29 JOIN :#lobby
+[23->user23] :user29 JOIN :#lobby
+[24->user24] :user29 JOIN :#lobby
+[25->user25] :user29 JOIN :#lobby
+[26->user26] :user29 JOIN :#lobby
+[27->user27] :user29 JOIN :#lobby
+[28->user28] :user29 JOIN :#lobby
+[29->user29] :user29 JOIN :#lobby
+[29->user29] :stress_test 353 user29 = #lobby :@user20 user21 user22 user23 user24 user25 user26 user27 user28 user29 
+[29->user29] :stress_test 366 user29 #lobby :End of /NAMES list.
+>> Simulating active chat...
+Processing message from fd 20: PRIVMSG #lobby :This is message from user20
+[20->user20] :user20 PRIVMSG #lobby :This is message from user20
+[21->user21] :user20 PRIVMSG #lobby :This is message from user20
+[22->user22] :user20 PRIVMSG #lobby :This is message from user20
+[23->user23] :user20 PRIVMSG #lobby :This is message from user20
+[24->user24] :user20 PRIVMSG #lobby :This is message from user20
+[25->user25] :user20 PRIVMSG #lobby :This is message from user20
+[26->user26] :user20 PRIVMSG #lobby :This is message from user20
+[27->user27] :user20 PRIVMSG #lobby :This is message from user20
+[28->user28] :user20 PRIVMSG #lobby :This is message from user20
+[29->user29] :user20 PRIVMSG #lobby :This is message from user20
+Processing message from fd 21: PRIVMSG #lobby :This is message from user21
+[20->user20] :user21 PRIVMSG #lobby :This is message from user21
+[21->user21] :user21 PRIVMSG #lobby :This is message from user21
+[22->user22] :user21 PRIVMSG #lobby :This is message from user21
+[23->user23] :user21 PRIVMSG #lobby :This is message from user21
+[24->user24] :user21 PRIVMSG #lobby :This is message from user21
+[25->user25] :user21 PRIVMSG #lobby :This is message from user21
+[26->user26] :user21 PRIVMSG #lobby :This is message from user21
+[27->user27] :user21 PRIVMSG #lobby :This is message from user21
+[28->user28] :user21 PRIVMSG #lobby :This is message from user21
+[29->user29] :user21 PRIVMSG #lobby :This is message from user21
+Processing message from fd 22: PRIVMSG #lobby :This is message from user22
+[20->user20] :user22 PRIVMSG #lobby :This is message from user22
+[21->user21] :user22 PRIVMSG #lobby :This is message from user22
+[22->user22] :user22 PRIVMSG #lobby :This is message from user22
+[23->user23] :user22 PRIVMSG #lobby :This is message from user22
+[24->user24] :user22 PRIVMSG #lobby :This is message from user22
+[25->user25] :user22 PRIVMSG #lobby :This is message from user22
+[26->user26] :user22 PRIVMSG #lobby :This is message from user22
+[27->user27] :user22 PRIVMSG #lobby :This is message from user22
+[28->user28] :user22 PRIVMSG #lobby :This is message from user22
+[29->user29] :user22 PRIVMSG #lobby :This is message from user22
+Processing message from fd 23: PRIVMSG #lobby :This is message from user23
+[20->user20] :user23 PRIVMSG #lobby :This is message from user23
+[21->user21] :user23 PRIVMSG #lobby :This is message from user23
+[22->user22] :user23 PRIVMSG #lobby :This is message from user23
+[23->user23] :user23 PRIVMSG #lobby :This is message from user23
+[24->user24] :user23 PRIVMSG #lobby :This is message from user23
+[25->user25] :user23 PRIVMSG #lobby :This is message from user23
+[26->user26] :user23 PRIVMSG #lobby :This is message from user23
+[27->user27] :user23 PRIVMSG #lobby :This is message from user23
+[28->user28] :user23 PRIVMSG #lobby :This is message from user23
+[29->user29] :user23 PRIVMSG #lobby :This is message from user23
+Processing message from fd 24: PRIVMSG #lobby :This is message from user24
+[20->user20] :user24 PRIVMSG #lobby :This is message from user24
+[21->user21] :user24 PRIVMSG #lobby :This is message from user24
+[22->user22] :user24 PRIVMSG #lobby :This is message from user24
+[23->user23] :user24 PRIVMSG #lobby :This is message from user24
+[24->user24] :user24 PRIVMSG #lobby :This is message from user24
+[25->user25] :user24 PRIVMSG #lobby :This is message from user24
+[26->user26] :user24 PRIVMSG #lobby :This is message from user24
+[27->user27] :user24 PRIVMSG #lobby :This is message from user24
+[28->user28] :user24 PRIVMSG #lobby :This is message from user24
+[29->user29] :user24 PRIVMSG #lobby :This is message from user24
+Channel #lobby: topic='', members=10, operators=1, inviteOnly=0, topicProtected=0
+  - user20 (operator)
+  - user21
+  - user22
+  - user23
+  - user24
+  - user25
+  - user26
+  - user27
+  - user28
+  - user29
+>> Stress test complete - 10 clients, 1 active channel
+
+Press Enter to continue...
