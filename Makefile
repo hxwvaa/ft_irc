@@ -9,7 +9,7 @@ NAME = ircserv
 
 # Source files
 SRCS = main.cpp \
-       server.cpp \
+       Server.cpp \
        parcer.cpp \
        commands.cpp
 
