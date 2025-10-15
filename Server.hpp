@@ -52,6 +52,8 @@ public:
     void run();
 
 private:
+    static const std::string SERVER_NAME;
+    
     int _port;
     std::string _password;
     int _sockfd;
@@ -66,6 +68,10 @@ private:
     void processMessage(int fd, const std::string& message);
     void sendReply(int fd, const std::string& reply);
     void broadcastToChannel(const std::string& channel, const std::string& message, int exclude_fd = -1);
+    
+    // Message formatting helpers
+    std::string formatServerReply(int fd, const std::string& numericAndParams) const;
+    std::string formatUserMessage(int fd, const std::string& command) const;
     
     // Helper functions for MODE
     bool isChannelOperator(const std::string& channel, int fd);
