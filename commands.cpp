@@ -562,8 +562,12 @@ void handleList(Server* server, int fd, const std::vector<std::string>& params) 
          it != channelMap.end(); ++it) {
         std::ostringstream oss;
         oss << it->second.members.size();
+        
+        // Include actual topic if set, otherwise show "No topic"
+        std::string topic = it->second.topic.empty() ? "No topic" : it->second.topic;
+        
         server->sendReply(fd, "322 " + client.nickname + " " + it->first + " " + 
-                 oss.str() + " :No topic\r\n");
+                 oss.str() + " :" + topic + "\r\n");
     }
     
     server->sendReply(fd, "323 " + client.nickname + " :End of LIST\r\n");
