@@ -381,9 +381,6 @@ void Server::processMessage(int fd, const std::string& message) {
             }
             sendReply(fd, formatServerReply(fd, "366 " + client.nickname + " " + channel + " :End of NAMES list"));
         }
-    // } else if (command == "NOTICE") {
-    //     // Handle NOTICE command (similar to PRIVMSG but no auto-replies)
-    //     handlePrivMsg(fd, params); // For simplicity, treat like PRIVMSG
     } else if (command == "WHOIS") {
         // Handle WHOIS command - show user information
         ClientInfo& client = _clients[fd];
