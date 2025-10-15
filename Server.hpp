@@ -6,6 +6,22 @@
 #include <map>
 #include <set>
 #include <poll.h>
+#include "parcer.hpp"
+
+struct ChannelInfo {
+    std::set<int> members;          // Client file descriptors
+    std::set<int> operators;        // Operator file descriptors
+    std::set<int> invited;          // Invited client file descriptors (for +i mode)
+    std::string key;                // Channel password
+    size_t userLimit;               // 0 means no limit
+    bool inviteOnly;                // +i mode
+    bool topicRestricted;           // +t mode
+    std::string topic;              // Channel topic
+    
+    ChannelInfo() : userLimit(0), inviteOnly(false), topicRestricted(true) {}
+    
+    std::string getModeString() const;
+};
 
 struct ClientInfo {
     int fd;
@@ -22,38 +38,33 @@ struct ClientInfo {
     ClientInfo(int socket_fd) : fd(socket_fd), authenticated(false), registered(false) {}
 };
 
-struct ChannelInfo {
-    std::set<int> members;          // Client file descriptors
-    std::set<int> operators;        // Operator file descriptors
-    std::set<int> invited;          // Invited client file descriptors (for +i mode)
-    std::string key;                // Channel password
-    size_t userLimit;               // 0 means no limit
-    bool inviteOnly;                // +i mode
-    bool topicRestricted;           // +t mode
-    std::string topic;              // Channel topic
-    
-    ChannelInfo() : userLimit(0), inviteOnly(false), topicRestricted(true) {}
-    
-    std::string getModeString() const {
-        std::string modes = "+";
-        if (inviteOnly) modes += "i";
-        if (topicRestricted) modes += "t";
-        if (!key.empty()) modes += "k";
-        if (userLimit > 0) modes += "l";
-        return modes;
-    }
-};
-
 class Server {
 public:
     Server(int port, const std::string &password);
     ~Server();
 
     void run();
+    
+    // Public helper functions for command handlers
+    std::string getPassword() const { return _password; }
+    ClientInfo& getClient(int fd);
+    ChannelInfo& getChannel(const std::string& name);
+    std::map<int, ClientInfo>& getClients() { return _clients; }
+    std::map<std::string, ChannelInfo>& getChannels() { return _channels; }
+    
+    void sendReply(int fd, const std::string& reply);
+    void broadcastToChannel(const std::string& channel, const std::string& message, int exclude_fd = -1);
+    std::string formatServerReply(int fd, const std::string& numericAndParams) const;
+    std::string formatUserMessage(int fd, const std::string& command) const;
+    
+    bool isChannelOperator(const std::string& channel, int fd);
+    bool isClientInChannel(const std::string& channel, int fd);
+    int getClientFdByNick(const std::string& nickname);
+    void removeClient(int fd);
+    
+    static const std::string SERVER_NAME;
 
 private:
-    static const std::string SERVER_NAME;
-    
     int _port;
     std::string _password;
     int _sockfd;
@@ -64,38 +75,8 @@ private:
     void setup();
     void handleNewConnection();
     void handleClientData(int fd);
-    void removeClient(int fd);
     void processMessage(int fd, const std::string& message);
-    void sendReply(int fd, const std::string& reply);
-    void broadcastToChannel(const std::string& channel, const std::string& message, int exclude_fd = -1);
     
-    // Message formatting helpers
-    std::string formatServerReply(int fd, const std::string& numericAndParams) const;
-    std::string formatUserMessage(int fd, const std::string& command) const;
-    
-    // Helper functions for MODE
-    bool isChannelOperator(const std::string& channel, int fd);
-    bool isClientInChannel(const std::string& channel, int fd);
-    int getClientFdByNick(const std::string& nickname);
-    bool stringToInt(const std::string& str, int& result);
-    
-    // IRC command handlers
-    void handlePass(int fd, const std::vector<std::string>& params);
-    void handleNick(int fd, const std::vector<std::string>& params);
-    void handleUser(int fd, const std::vector<std::string>& params);
-    void handleJoin(int fd, const std::vector<std::string>& params);
-    void handlePrivMsg(int fd, const std::vector<std::string>& params);
-    void handleQuit(int fd, const std::vector<std::string>& params);
-    void handlePing(int fd, const std::vector<std::string>& params);
-    void handlePart(int fd, const std::vector<std::string>& params);
-    void handleMode(int fd, const std::vector<std::string>& params);
-    void handleWho(int fd, const std::vector<std::string>& params);
-    void handleList(int fd, const std::vector<std::string>& params);
-    void handleKick(int fd, const std::vector<std::string>& params);
-    void handleInvite(int fd, const std::vector<std::string>& params);
-    
-    std::vector<std::string> parseMessage(const std::string& message);
-    bool isValidNickname(const std::string& nick);
     static void signalHandler(int signum);
 };
 
