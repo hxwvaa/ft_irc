@@ -10,15 +10,12 @@ NAME = ircserv
 # Source files
 SRCS = main.cpp \
        Server.cpp \
-	   client.cpp \
-	   channel.cpp \
-	   parcer.cpp
 
 # Object files
 OBJS = $(SRCS:.cpp=.o)
 
 # Header files
-HDRS = Server.hpp channel.hpp client.hpp parcer.hpp
+HDRS = Server.hpp
 
 # Default rule
 all: $(NAME)
