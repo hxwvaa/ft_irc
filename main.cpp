@@ -1,8 +1,4 @@
 #include "Server.hpp"
-#include <iostream>
-#include <cstdlib>
-#include <cerrno>
-#include <climits>
 
 int main(int argc, char **argv) {
     if (argc != 3) {

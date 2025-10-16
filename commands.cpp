@@ -102,8 +102,6 @@ void handleUser(Server* server, int fd, const std::vector<std::string>& params) 
     }
 
     client.username = params[0];
-    // params[1] is mode (unused), params[2] is unused
-    // Set hostname to localhost (in a real server, would use client's actual hostname)
     client.hostname = "localhost";
     client.realname = params[3];
     
@@ -504,10 +502,11 @@ void handleMode(Server* server, int fd, const std::vector<std::string>& params) 
             modeMsg += "\r\n";
             server->broadcastToChannel(target, modeMsg, -1);
         }
-    } else {
-        // User mode - we don't support user modes, just send empty mode string
-        // server->sendReply(fd, "221 " + client.nickname + " +\r\n");
     }
+    // } else {
+    //     // User mode - we don't support user modes, just send empty mode string
+    //     // server->sendReply(fd, "221 " + client.nickname + " +\r\n");
+    // }
 }
 
 void handleWho(Server* server, int fd, const std::vector<std::string>& params) {

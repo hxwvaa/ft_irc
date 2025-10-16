@@ -5,7 +5,24 @@
 #include <vector>
 #include <map>
 #include <set>
+#include <iostream>
+#include <cstdlib>
+#include <cerrno>
+#include <climits>
+#include <iostream>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <unistd.h>
+#include <stdexcept>
+#include <fcntl.h>
 #include <poll.h>
+#include <vector>
+#include <csignal>
+#include <cstring>
+#include <sstream>
+#include <algorithm>
+#include <cctype>
+#include <cerrno>
 #include "parcer.hpp"
 
 struct ChannelInfo {

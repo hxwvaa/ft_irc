@@ -1,19 +1,5 @@
 #include "Server.hpp"
 #include "parcer.hpp"
-#include <iostream>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <unistd.h>
-#include <stdexcept>
-#include <fcntl.h>
-#include <poll.h>
-#include <vector>
-#include <csignal>
-#include <cstring>
-#include <sstream>
-#include <algorithm>
-#include <cctype>
-#include <cerrno>
 
 static bool g_server_running = true;
 
@@ -100,7 +86,7 @@ void Server::run() {
         }
 
         // Collect file descriptors to process to avoid iterator invalidation
-        //Checking Which fds have data to read and collect then into fds_to_process
+        // Checking which fds have data to read and collect then into fds_to_process
         std::vector<int> fds_to_process;
         for (size_t i = 1; i < _fds.size(); ++i) {
             if (_fds[i].revents & POLLIN) {
@@ -288,16 +274,13 @@ void Server::processMessage(int fd, const std::string& message) {
     } else if (command == "INVITE") {
         ::handleInvite(this, fd, params);
     } else if (command == "CAP") {
-        // Handle CAP (Client Capability) command for modern IRC clients like irssi
-        // We don't support any capabilities, so just acknowledge
+        // CAP (Client Capability) command for modern IRC clients like irssi
         if (!params.empty()) {
             std::string subcmd = params[0];
             std::transform(subcmd.begin(), subcmd.end(), subcmd.begin(), ::toupper);
             if (subcmd == "LS") {
-                // Client asking for supported capabilities - we support none
                 sendReply(fd, "CAP * LS :\r\n");
             } else if (subcmd == "END") {
-                // Client ending capability negotiation - just acknowledge
                 // No response needed for CAP END
             } else if (subcmd == "REQ") {
                 // Client requesting capabilities - we don't support any
@@ -305,7 +288,6 @@ void Server::processMessage(int fd, const std::string& message) {
             }
         }
     } else if (command == "TOPIC") {
-        // Handle TOPIC command
         ClientInfo& client = _clients[fd];
         if (!client.registered) {
             sendReply(fd, formatServerReply(fd, "451 " + (client.nickname.empty() ? std::string("*") : client.nickname) + " :You have not registered"));

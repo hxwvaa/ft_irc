@@ -15,10 +15,9 @@ std::vector<std::string> parseMessage(const std::string& message) {
     while (pos < message.length() && (message[pos] == ' ' || message[pos] == '\t')) {
         pos++;
     }
-    
     // Parse the message according to IRC RFC 2812
     // Format: [':' prefix SPACE] command [SPACE params] [SPACE ':' trailing]
-    
+
     // Skip prefix if present (starts with ':')
     if (pos < message.length() && message[pos] == ':') {
         // Skip to next space (end of prefix)
@@ -30,7 +29,6 @@ std::vector<std::string> parseMessage(const std::string& message) {
             pos++;
         }
     }
-    
     // Parse command and parameters
     while (pos < message.length()) {
         if (message[pos] == ' ') {
@@ -74,7 +72,7 @@ std::vector<std::string> parseMessage(const std::string& message) {
     
     return tokens;
 }
-
+// Helper function: Split string by commas
 std::vector<std::string> splitByComma(const std::string& str) {
     std::vector<std::string> result;
     std::string current;
@@ -110,11 +108,8 @@ bool stringToInt(const std::string& str, int& result) {
 // Helper function: Check if nickname is valid
 bool isValidNickname(const std::string& nick) {
     if (nick.empty() || nick.length() > 9) return false;
-    
-    // First character must be letter
     if (!std::isalpha(nick[0])) return false;
     
-    // Rest can be letters, digits, or special characters
     for (size_t i = 1; i < nick.length(); ++i) {
         char c = nick[i];
         if (!std::isalnum(c) && c != '-' && c != '_' && c != '[' && c != ']' && c != '{' && c != '}' && c != '\\' && c != '|') {
